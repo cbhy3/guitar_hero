@@ -1,5 +1,9 @@
 (async ()=>{
     let editMode = false;
+    let score = 0;
+    let combo = 0;
+    let adrenaline_meter = 0;
+    let adrenaline = 1; // adrenaline == 1 means no adrenaline, 2 means adrenaline
     let recordedNotes = [];
     let holdStartTimes = {};
     const canvas = document.getElementById('game');
@@ -10,16 +14,22 @@
     const scrollSpeed = 400;
     const lookahead = 1.5;
     
-    const windowPerfect = 50;
-    const windowGreat = 100;
-    const windowGood = 140;
+    const windowPerfect = 55;
+    const windowGreat = 110;
+    const windowGood = 175;
     let countdown = false;
     let judgement = '';
     const laneActive = [false, false, false, false, false];
-    const mapResponse = await fetch('still_into_you.json');
+    const mapResponse = await fetch('smoking.json');
     const map = await mapResponse.json();
     const pixelsPerSecond = scrollSpeed * (map.bpm/100);
+    const barFill = document.getElementById("barFill");
+    let percent = 0;
 
+    function setBar(percentValue) {
+    percent = Math.max(0, Math.min(100, percentValue));
+    barFill.style.height = percent + "%";
+    }
 
 
     const audioContext = new window.AudioContext();
@@ -84,15 +94,13 @@
             console.log('--- CHART JSON ---');
             console.log(JSON.stringify(chart, null, 2));
         }
-        if (!(key in keyMap)) return;
+        if (!(key in keyMap)) {e.preventDefault; return;}
         const lane = keyMap[key];
         if (editMode && audioStartTime) {
-         const now = audioContext.currentTime - audioStartTime;
-         
-       
-        if (!holdStartTimes[lane]) {
-            holdStartTimes[lane] = now;
-        }
+            const now = audioContext.currentTime - audioStartTime;
+            if (!holdStartTimes[lane]) {
+                holdStartTimes[lane] = now;
+            }
         }
         
         
@@ -153,20 +161,24 @@
         activeHold.holding = false;
 
 
-        const releaseGrace = 0.15; 
+        const releaseGrace = 0.20; 
         if (now < activeHold.endTime - releaseGrace || now > activeHold.endTime + releaseGrace) {
             console.log('missed');
             judgement = 'Miss'
             activeHold.hit = false;
+            combo = 0; 
+            adrenaline_meter -= adrenaline === 2 ? 30 : 0; 
         } else {
             console.log('success');
-            if (now - activeHold.endTime > 0.10 || now - activeHold.endTime < -0.10){ judgement = 'Good'}
-            else if (now - activeHold.endTime > 0.051 || now-activeHold.endTime < -0.051) { judgement = 'Great'}
-            else {judgement = 'Perfect'};
+            if (now - activeHold.endTime > 0.13 || now - activeHold.endTime < -0.13){ judgement = 'Good'; score += 1 * adrenaline; adrenaline_meter += adrenaline === 1 ? 1 : -2;}
+            else if (now - activeHold.endTime > 0.071 || now-activeHold.endTime < -0.071) { judgement = 'Great'; score += 3 * adrenaline; adrenaline_meter += adrenaline === 1 ? 1 : -2;}
+            else {judgement = 'Perfect'; score += 5 * adrenaline; adrenaline_meter += adrenaline === 1 ? 1 : -2;};
             activeHold.hit = true;
             activeHold.hold_success = true;
+            score += Math.round(2 * activeHold.duration/ 10)
         }
     });
+    
     function handleHit(lane) {
     const now = audioContext.currentTime - audioStartTime;
     const candidates = notes
@@ -179,10 +191,21 @@
     }
     const best = candidates[0];
     const absDt = Math.abs(best.dt);
-    judgement = 'Miss';
-    if (absDt <= windowPerfect) judgement = 'Perfect';
-    else if (absDt <= windowGreat) judgement = 'Great';
-    else if (absDt <= windowGood) judgement = 'Good';
+    
+    if (absDt <= windowPerfect) {judgement = 'Perfect'; combo += 1; score += 5 * adrenaline ; adrenaline_meter += adrenaline === 1 ? 1 : -2;}
+    else if (absDt <= windowGreat) {judgement = 'Great'; combo += 1; score += 3 * adrenaline; adrenaline_meter += adrenaline === 1 ? 1 : -2; }
+    else if (absDt <= windowGood) {judgement = 'Good'; combo += 1; score += 1 * adrenaline; adrenaline_meter += adrenaline === 1 ? 1 : -2; }
+    else {judgement = 'Miss'; }
+    let color;
+    switch (judgement) {
+    case 'Perfect': color = 'rgba(11, 157, 224, 1)'; break;
+    case 'Great'  : color = 'rgba(23, 181, 70, 1)'; break;
+    case 'Good'   : color = 'rgba(194, 176, 38, 1)'; break;
+    case 'Miss'   : color = 'rgba(224, 11, 11, 1)'; break;
+    default: color = '#fff';
+    }
+
+    startPop(judgement, color, canvas.width / 2 - 50, 100);
     if (best.n.type === 'tap') {
         best.n.judged = true;
         best.n.hit = absDt <= windowGood;
@@ -194,10 +217,92 @@
         best.n.judged = best.n.hit; 
         best.n.holdStartTime = now;
     }
+    
     console.log('Judged', judgement, 'dt', Math.round(best.dt));
   }
 
+
+        // ---- Pop effect (robust) ----
+    const popEffect = {
+    active: false,
+    start: 0,
+    duration: 400,
+    maxScale: 1.6,
+    text: '',
+    color: '#fff',
+    font: '32px sans-serif',
+    x: 0,
+    y: 0
+    };
+
+    function startPop(text, color, x, y, opts = {}) {
+    popEffect.active = true;
+    popEffect.start = performance.now();
+    popEffect.text = text;
+    popEffect.color = color || popEffect.color || '#fff';
+    popEffect.x = x;
+    popEffect.y = y;
+    if (opts.duration != null) popEffect.duration = opts.duration;
+    if (opts.maxScale != null) popEffect.maxScale = opts.maxScale;
+    if (opts.font) popEffect.font = opts.font;
+    }
+
+    function drawPop(ctx) {
+    if (!popEffect.active) return;
+
+    const now = performance.now();
+    const elapsed = now - popEffect.start;
+    const progress = Math.min(elapsed / popEffect.duration, 1);
+    const scale = 1 + Math.sin(progress * Math.PI) * (popEffect.maxScale - 1);
+
+    // set font first so measureText is correct
+    ctx.save();
+    ctx.font = popEffect.font;
+
+    // measure text width to compute center so scaling keeps perceived position
+    const metrics = ctx.measureText(popEffect.text);
+    const textWidth = metrics.width;
+
+    // If you want a better vertical centering, approximate height from font size
+    // (font is like "32px sans-serif" — extract the px number)
+    const fontSizeMatch = popEffect.font.match(/(\d+)px/);
+    const fontSize = fontSizeMatch ? parseInt(fontSizeMatch[1], 10) : 32;
+    const textHeight = fontSize; // approximate
+
+    // Translate to the text center, scale, then draw centered at 0,0
+    const centerX = popEffect.x + textWidth / 2;
+    const centerY = popEffect.y; // keep same y; adjust if you want vertical center offsets
+
+    ctx.translate(centerX, centerY);
+    ctx.scale(scale, scale);
+
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+
+    // ensure fillStyle is explicitly set
+    ctx.fillStyle = popEffect.color || '#fff';
+    ctx.font = popEffect.font; // set again inside saved context
+    ctx.fillText(popEffect.text, 0, 0);
+
+    ctx.restore();
+
+    if (progress >= 1) popEffect.active = false;
+    }
+
     function draw() {
+    setBar(adrenaline_meter > 0 ? (adrenaline_meter/300) * 100 : 0 )
+    document.getElementById("score").textContent = "Score: "+score;
+    document.getElementById("combo").textContent = "Combo: x"+combo;
+    document.getElementById("time").textContent = Math.round((audioContext.currentTime - audioStartTime) * 100) /100;
+    const barContainer = document.getElementById("barContainer");
+    if (adrenaline_meter >= 300) {
+        adrenaline = 2;
+        barContainer.classList.add("glow");
+    }
+    else if (adrenaline_meter < 1) {
+        adrenaline = 1;
+        barContainer.classList.remove("glow");
+    }
     ctx.clearRect(0,0,canvas.width,canvas.height);
     
     for (let i = 0; i < lanes; i++) {
@@ -227,27 +332,25 @@
       ctx.font = '20px sans-serif';
       ctx.fillText('Press SPACE to start', 120, canvas.height/2);
     } else {
-      switch (judgement) {
-        case 'Perfect' : ctx.fillStyle = 'rgba(11, 157, 224, 1)'; break;
-        case 'Great' : ctx.fillStyle = 'rgba(23, 181, 70, 1)'; break;
-        case 'Good' : ctx.fillStyle = 'rgba(194, 176, 38, 1)'; break;
-        case 'Miss' : ctx.fillStyle = 'rgba(224, 11, 11, 1)'; break;
-      }
-      ctx.font = '32px sans-serif';
-      ctx.fillText(judgement, canvas.width / 2 - 50, 100);
+      
       const now = audioContext.currentTime;
       const songTime = now - audioStartTime; 
-      // --- Miss detection ---
+      // miss detection
         for (const note of notes) {
-        if (note.judged) continue;
+            if (note.judged) continue;
 
-        const dt = (songTime - note.time) * 1000;
+            const dt = (songTime - note.time) * 1000;
 
-        if (dt > windowGood) {
-            note.judged = true;
-            note.hit = false;
-            judgement = 'Miss';
-        }
+            if (dt > windowGood) {
+                note.judged = true;
+                note.hit = false;
+                judgement = 'Miss';
+                combo = 0 ; 
+                adrenaline_meter -= adrenaline === 2 ? 10 : 0; 
+                startPop(judgement, 'rgba(224, 11, 11, 1)', canvas.width / 2 - 50, 100);
+            }
+            
+            
         }
       // render notes within lookahead
       for (const note of notes) {
@@ -259,11 +362,26 @@
         const yStart = hitY - dt * pixelsPerSecond;
         const yEnd = hitY - endDt * pixelsPerSecond;
         const x = note.lane * laneWidth + laneWidth/2;
+
         if (note.type === 'tap') {
             ctx.beginPath();
-            ctx.fillStyle = note.judged ? (note.hit ? 'rgba(0, 255, 0, 0)' : '#900') : '#0aa';
+            ctx.fillStyle = note.judged ? (note.hit ? 'rgba(0, 255, 0, 0)' : '#900') : adrenaline === 2 ? 'rgba(41, 212, 212, 1)' :
+            (note.lane === 0 ?'rgba(41, 144, 22, 1)' : 
+                (note.lane === 1 ? 'rgba(144, 26, 22, 1)' :
+                    note.lane === 2 ? 'rgba(165, 154, 24, 1)' : note.lane === 3 ? 'rgba(22, 55, 144, 1)' : 'rgba(170, 100, 25, 1)'
+                    
+                ));
+            
             ctx.arc(x, yStart, Math.min(24, 16 + (1 - Math.min(1, dt/lookahead))*12), 0, Math.PI*2);
+            
             ctx.fill();
+            ctx.save();
+            
+            ctx.clip();
+            ctx.lineWidth = 4;
+            ctx.strokeStyle = note.judged ? (note.hit ? 'rgba(0,0,0,0)' : 'rgba(0, 0, 0, 1)') : 'rgba(0, 0, 0, 1)';
+            ctx.stroke();
+            ctx.restore();
       }
         if (note.type === 'hold') {
             const progressTime = Math.max(0, Math.min(songTime - note.time, note.duration));
@@ -280,7 +398,11 @@
             }
 
             ctx.beginPath();
-            ctx.strokeStyle = note.holding ? 'rgba(0, 255, 0, 0.5)' : (!note.released ? '#0aa' : 'rgba(0,0,0,0)');
+            ctx.strokeStyle = note.holding ? 'rgba(0, 255, 0, 0.5)' : (!note.released ? adrenaline === 2 ? 'rgba(41, 212, 212, 1)' : (note.lane === 0 ?'rgba(41, 144, 22, 1)' : 
+                (note.lane === 1 ? 'rgba(144, 26, 22, 1)' :
+                    note.lane === 2 ? 'rgba(165, 154, 24, 1)' : note.lane === 3 ? 'rgba(22, 55, 144, 1)' : 'rgba(170, 100, 25, 1)'
+                    
+                )) : 'rgba(0,0,0,0)');
             ctx.lineWidth = 14;
             ctx.moveTo(x, tailStartY);
             ctx.lineTo(x, yEnd);
@@ -288,9 +410,21 @@
 
             if (!note.holding) {
                 ctx.beginPath();
-                ctx.fillStyle = note.judged ? (note.hit ? 'rgba(0, 255, 0, 0)' : '#900') : '#0aa';
+                ctx.fillStyle = note.judged ? (note.hit ? 'rgba(0, 255, 0, 0)' : '#900') : adrenaline === 2 ? 'rgba(41, 212, 212, 1)' : (note.lane === 0 ?'rgba(41, 144, 22, 1)' : 
+                (note.lane === 1 ? 'rgba(144, 26, 22, 1)' :
+                    note.lane === 2 ? 'rgba(165, 154, 24, 1)' : note.lane === 3 ? 'rgba(22, 55, 144, 1)' : 'rgba(170, 100, 25, 1)'
+                    
+                ));;
+                
                 ctx.arc(x, yStart, 20, 0, Math.PI * 2);
                 ctx.fill();
+                ctx.save();
+                
+                ctx.clip();
+                ctx.lineWidth = 4;
+                ctx.strokeStyle = note.judged ? (note.hit ? 'rgba(0,0,0,0)' : 'rgba(0,0,0,1)') : 'rgba(0,0,0,1)';
+                ctx.stroke();
+                ctx.restore();
             }
 
             
@@ -302,6 +436,7 @@
             
     }
     }
+    drawPop(ctx);
     }
     requestAnimationFrame(draw);
   }
