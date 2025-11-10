@@ -6,6 +6,7 @@
     let adrenaline = 1; // adrenaline == 1 means no adrenaline, 2 means adrenaline
     let recordedNotes = [];
     let holdStartTimes = {};
+    const keysDown = {};
     const canvas = document.getElementById('game');
     const ctx = canvas.getContext('2d');
     const lanes = 5;
@@ -20,7 +21,7 @@
     let countdown = false;
     let judgement = '';
     const laneActive = [false, false, false, false, false];
-    const mapResponse = await fetch('smoking.json');
+    const mapResponse = await fetch('the_wall.json');
     const map = await mapResponse.json();
     const pixelsPerSecond = scrollSpeed * (map.bpm/100);
     const barFill = document.getElementById("barFill");
@@ -64,6 +65,7 @@
     const keyMap = {'a': 0, 's': 1, 'j': 2, 'k':3,'l':4};
     window.addEventListener('keydown', (e) =>{
         const key = e.key.toLowerCase();
+        if (keysDown[key]) return;
         
         if (key == ' ') {
             
@@ -95,6 +97,7 @@
             console.log(JSON.stringify(chart, null, 2));
         }
         if (!(key in keyMap)) {e.preventDefault; return;}
+        keysDown[key] = true;
         const lane = keyMap[key];
         if (editMode && audioStartTime) {
             const now = audioContext.currentTime - audioStartTime;
@@ -112,6 +115,7 @@
     window.addEventListener('keyup', (e) => {
         const k = e.key.toLowerCase();
         if (!(k in keyMap)) return;
+        keysDown[k] = false;
         const lane = keyMap[k];
         laneActive[lane] = false;
         if (editMode && audioStartTime) {
@@ -148,7 +152,7 @@
         
         const activeHold = notes
             .filter(n => n.type === 'hold' && n.holding && !n.released)
-            .filter(n => (n.lane === lane) || (n.lane === lane + 1)) 
+            .filter(n => (n.lane === lane) ) 
             .sort((a, b) => a.endTime - b.endTime)[0]; 
 
         if (!activeHold) {
@@ -191,21 +195,10 @@
     }
     const best = candidates[0];
     const absDt = Math.abs(best.dt);
-    
+    judgement = 'Miss';
     if (absDt <= windowPerfect) {judgement = 'Perfect'; combo += 1; score += 5 * adrenaline ; adrenaline_meter += adrenaline === 1 ? 1 : -2;}
     else if (absDt <= windowGreat) {judgement = 'Great'; combo += 1; score += 3 * adrenaline; adrenaline_meter += adrenaline === 1 ? 1 : -2; }
     else if (absDt <= windowGood) {judgement = 'Good'; combo += 1; score += 1 * adrenaline; adrenaline_meter += adrenaline === 1 ? 1 : -2; }
-    else {judgement = 'Miss'; }
-    let color;
-    switch (judgement) {
-    case 'Perfect': color = 'rgba(11, 157, 224, 1)'; break;
-    case 'Great'  : color = 'rgba(23, 181, 70, 1)'; break;
-    case 'Good'   : color = 'rgba(194, 176, 38, 1)'; break;
-    case 'Miss'   : color = 'rgba(224, 11, 11, 1)'; break;
-    default: color = '#fff';
-    }
-
-    startPop(judgement, color, canvas.width / 2 - 50, 100);
     if (best.n.type === 'tap') {
         best.n.judged = true;
         best.n.hit = absDt <= windowGood;
@@ -217,6 +210,17 @@
         best.n.judged = best.n.hit; 
         best.n.holdStartTime = now;
     }
+    let color;
+    switch (judgement) {
+    case 'Perfect': color = 'rgba(11, 157, 224, 1)'; break;
+    case 'Great'  : color = 'rgba(23, 181, 70, 1)'; break;
+    case 'Good'   : color = 'rgba(194, 176, 38, 1)'; break;
+    case 'Miss'   : color = 'rgba(224, 11, 11, 1)'; break;
+    default: color = '#fff';
+    }
+
+    startPop(judgement, color, canvas.width / 2 - 50, 100);
+    
     
     console.log('Judged', judgement, 'dt', Math.round(best.dt));
   }
@@ -288,12 +292,23 @@
 
     if (progress >= 1) popEffect.active = false;
     }
+    function formatTime(seconds) {
+        const minutes = Math.floor(seconds / 60);
+        const secs = Math.floor(seconds % 60);
+        const millis = Math.floor((seconds % 1) * 1000);
+
+        const m = minutes.toString().padStart(2, '0');
+        const s = secs.toString().padStart(2, '0');
+        const ms = millis.toString().padStart(3, '0');
+
+        return `${m}:${s}.${ms}`;
+    }
 
     function draw() {
     setBar(adrenaline_meter > 0 ? (adrenaline_meter/300) * 100 : 0 )
     document.getElementById("score").textContent = "Score: "+score;
     document.getElementById("combo").textContent = "Combo: x"+combo;
-    document.getElementById("time").textContent = Math.round((audioContext.currentTime - audioStartTime) * 100) /100;
+    document.getElementById("time").textContent = formatTime(audioContext.currentTime - audioStartTime);
     const barContainer = document.getElementById("barContainer");
     if (adrenaline_meter >= 300) {
         adrenaline = 2;
