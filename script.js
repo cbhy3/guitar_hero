@@ -6,6 +6,7 @@
     let adrenaline = 1; // adrenaline == 1 means no adrenaline, 2 means adrenaline
     let recordedNotes = [];
     let holdStartTimes = {};
+    const toSpark = {0:0,1:0,2:0,3:0,4:0};
     const keysDown = {};
     const canvas = document.getElementById('game');
     const ctx = canvas.getContext('2d');
@@ -184,45 +185,50 @@
     });
     
     function handleHit(lane) {
-    const now = audioContext.currentTime - audioStartTime;
-    const candidates = notes
-      .filter(n => !n.judged && n.lane === lane)
-      .map(n => ({n, dt: (n.time - now) * 1000 })) 
-      .filter(x => Math.abs(x.dt) <= windowGood)
-      .sort((a,b) => Math.abs(a.dt) - Math.abs(b.dt));
-    if (candidates.length === 0) {
-      return;
-    }
-    const best = candidates[0];
-    const absDt = Math.abs(best.dt);
-    judgement = 'Miss';
-    if (absDt <= windowPerfect) {judgement = 'Perfect'; combo += 1; score += 5 * adrenaline ; adrenaline_meter += adrenaline === 1 ? 1 : -2;}
-    else if (absDt <= windowGreat) {judgement = 'Great'; combo += 1; score += 3 * adrenaline; adrenaline_meter += adrenaline === 1 ? 1 : -2; }
-    else if (absDt <= windowGood) {judgement = 'Good'; combo += 1; score += 1 * adrenaline; adrenaline_meter += adrenaline === 1 ? 1 : -2; }
-    if (best.n.type === 'tap') {
-        best.n.judged = true;
-        best.n.hit = absDt <= windowGood;
-    }
+        const now = audioContext.currentTime - audioStartTime;
+        const candidates = notes
+        .filter(n => !n.judged && n.lane === lane)
+        .map(n => ({n, dt: (n.time - now) * 1000 })) 
+        .filter(x => Math.abs(x.dt) <= windowGood)
+        .sort((a,b) => Math.abs(a.dt) - Math.abs(b.dt));
+        if (candidates.length === 0) {
+            toSpark[lane] = false;
+        return;
+        }
+        const best = candidates[0];
+        const absDt = Math.abs(best.dt);
+        judgement = 'Miss';
+        if (absDt <= windowPerfect) {judgement = 'Perfect'; combo += 1; score += 5 * adrenaline ; adrenaline_meter += adrenaline === 1 ? 1 : -2;}
+        else if (absDt <= windowGreat) {judgement = 'Great'; combo += 1; score += 3 * adrenaline; adrenaline_meter += adrenaline === 1 ? 1 : -2; }
+        else if (absDt <= windowGood) {judgement = 'Good'; combo += 1; score += 1 * adrenaline; adrenaline_meter += adrenaline === 1 ? 1 : -2; }
+        if (best.n.type === 'tap') {
+            best.n.judged = true;
+            best.n.hit = absDt <= windowGood;
+        }
 
-    if (best.n.type === 'hold') {
-        best.n.hit = absDt <= windowGood;
-        best.n.holding = best.n.hit;
-        best.n.judged = best.n.hit; 
-        best.n.holdStartTime = now;
-    }
-    let color;
-    switch (judgement) {
-    case 'Perfect': color = 'rgba(11, 157, 224, 1)'; break;
-    case 'Great'  : color = 'rgba(23, 181, 70, 1)'; break;
-    case 'Good'   : color = 'rgba(194, 176, 38, 1)'; break;
-    case 'Miss'   : color = 'rgba(224, 11, 11, 1)'; break;
-    default: color = '#fff';
-    }
+        if (best.n.type === 'hold') {
+            best.n.hit = absDt <= windowGood;
+            best.n.holding = best.n.hit;
+            best.n.judged = best.n.hit; 
+            best.n.holdStartTime = now;
+        }
+        let color;
+        switch (judgement) {
+        case 'Perfect': color = 'rgba(11, 157, 224, 1)'; break;
+        case 'Great'  : color = 'rgba(23, 181, 70, 1)'; break;
+        case 'Good'   : color = 'rgba(194, 176, 38, 1)'; break;
+        case 'Miss'   : color = 'rgba(224, 11, 11, 1)'; break;
+        default: color = '#fff';
+        }
+        if (judgement != 'Miss') {
+            console.log('spoarj');
+            toSpark[lane] = true;
+        }
 
-    startPop(judgement, color, canvas.width / 2 - 50, 100);
-    
-    
-    console.log('Judged', judgement, 'dt', Math.round(best.dt));
+        startPop(judgement, color, canvas.width / 2 - 50, 100);
+        
+        
+        console.log('Judged', judgement, 'dt', Math.round(best.dt));
   }
 
 
@@ -259,23 +265,20 @@
     const progress = Math.min(elapsed / popEffect.duration, 1);
     const scale = 1 + Math.sin(progress * Math.PI) * (popEffect.maxScale - 1);
 
-    // set font first so measureText is correct
     ctx.save();
     ctx.font = popEffect.font;
 
-    // measure text width to compute center so scaling keeps perceived position
     const metrics = ctx.measureText(popEffect.text);
     const textWidth = metrics.width;
 
-    // If you want a better vertical centering, approximate height from font size
-    // (font is like "32px sans-serif" — extract the px number)
+    
     const fontSizeMatch = popEffect.font.match(/(\d+)px/);
     const fontSize = fontSizeMatch ? parseInt(fontSizeMatch[1], 10) : 32;
-    const textHeight = fontSize; // approximate
+    const textHeight = fontSize; 
 
-    // Translate to the text center, scale, then draw centered at 0,0
+
     const centerX = popEffect.x + textWidth / 2;
-    const centerY = popEffect.y; // keep same y; adjust if you want vertical center offsets
+    const centerY = popEffect.y; 
 
     ctx.translate(centerX, centerY);
     ctx.scale(scale, scale);
@@ -283,15 +286,51 @@
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
 
-    // ensure fillStyle is explicitly set
     ctx.fillStyle = popEffect.color || '#fff';
-    ctx.font = popEffect.font; // set again inside saved context
+    ctx.font = popEffect.font; 
     ctx.fillText(popEffect.text, 0, 0);
 
     ctx.restore();
 
     if (progress >= 1) popEffect.active = false;
     }
+    function drawSparks(ctx, x, y, radius, count = 8) {
+           const flareY = y - radius * 0.7;
+            const flareHeight = radius * 1.3;      
+            const flareWidth = radius * 0.8;       
+
+            // --- CORE GLOW COLUMN ---
+            const grad = ctx.createLinearGradient(x, flareY, x, flareY - flareHeight);
+            grad.addColorStop(0.0, 'rgba(255, 255, 180, 0.9)');
+            grad.addColorStop(0.2, 'rgba(255, 180, 80, 0.8)');
+            grad.addColorStop(0.5, 'rgba(255, 80, 10, 0.6)');
+            grad.addColorStop(1.0, 'rgba(60, 0, 0, 0)');
+
+            ctx.save();
+            ctx.globalCompositeOperation = 'lighter';
+            ctx.fillStyle = grad;
+            ctx.fillRect(x - flareWidth / 2, flareY - flareHeight, flareWidth, flareHeight);
+
+            // --- FLICKERING FLAME STREAKS ---
+            const flameSpread = flareWidth * 0.6;  
+            for (let i = 0; i < 10; i++) {       
+                const offsetX = (Math.random() - 0.5) * flameSpread;
+                const jitter = (Math.random() - 0.5) * radius * 0.2;
+                const height = flareHeight * (0.8 + Math.random() * 0.4);
+                ctx.beginPath();
+                ctx.moveTo(x + offsetX, flareY + jitter);
+                ctx.lineTo(x + offsetX + (Math.random() - 0.5) * 15, flareY - height);
+                ctx.strokeStyle = `rgba(255, ${100 + Math.random() * 100}, 0, ${0.3 + Math.random() * 0.5})`;
+                ctx.lineWidth = 2 + Math.random() * 3;
+                ctx.shadowBlur = 10;
+                ctx.shadowColor = 'rgba(255, 100, 0, 1)';
+                ctx.stroke();
+            }
+            ctx.restore();
+
+            
+}
+
     function formatTime(seconds) {
         const minutes = Math.floor(seconds / 60);
         const secs = Math.floor(seconds % 60);
@@ -326,17 +365,19 @@
         ctx.fillRect(i * laneWidth, 0, laneWidth, canvas.height);
 
         
-        if (laneActive[i]) {
-            ctx.fillStyle = 'rgba(0, 200, 255, 0.3)'; 
-            ctx.fillRect(i * laneWidth, 0, laneWidth, canvas.height);
-        }
-
+        
+        ctx.lineWidth = 5;
         ctx.strokeStyle = '#333';
         ctx.strokeRect(i * laneWidth, 0, laneWidth, canvas.height);
     }
     // draw hit line
     ctx.fillStyle = '#444';
     ctx.fillRect(0, hitY, canvas.width, 6);
+    var lane_colors = ['rgba(41, 144, 22, 1)', 'rgba(144, 26, 22, 1)','rgba(165, 154, 24, 1)','rgba(22, 55, 144, 1)',  'rgba(170, 100, 25, 1)', 'rgba(41, 212, 212, 1)']
+    
+    
+        
+    
     if (countdown) {
                 ctx.fillStyle = '#fff';
                 ctx.font = '20px sans-serif';
@@ -451,7 +492,55 @@
             
     }
     }
+    
     drawPop(ctx);
+    }
+    for (var i = 0; i < lanes; i++) {
+        
+        const x = (canvas.width / 5) * i + 45;
+        const y = hitY;
+        const radius = 28;
+        
+        ctx.save();
+        
+        ctx.shadowColor = 'rgba(0, 0, 0, 0.6)';
+        ctx.shadowBlur = 12;
+        ctx.shadowOffsetX = 4;
+        ctx.shadowOffsetY = 4;
+        ctx.beginPath();
+        ctx.fillStyle = 'rgba(36, 36, 36, 1)';
+        ctx.arc(x, y, radius, 0, Math.PI * 2);
+        ctx.fill();
+        
+
+       
+
+        ctx.beginPath();
+        ctx.lineWidth = 12;
+        ctx.strokeStyle = adrenaline == 1 ? lane_colors[i] : lane_colors[5];
+        ctx.arc(x, y, radius, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.restore();
+        if (laneActive[i]) {
+            if (toSpark[i]) {
+                drawSparks(ctx,x,y, radius,15);
+            }
+            ctx.beginPath();
+            ctx.arc(x, y - 5, radius - 10, 0, Math.PI * 2); 
+            ctx.lineWidth = 6;
+            ctx.strokeStyle = 'rgba(80, 80, 80, 1)';
+            ctx.stroke();
+            ctx.beginPath()
+            ctx.fillStyle = adrenaline == 1 ? lane_colors[i] : lane_colors[5];
+            ctx.arc(x, y - 8, radius - 10, 0, Math.PI * 2)
+            ctx.fill();
+            ctx.globalAlpha = 0.1;
+            ctx.fillStyle = 'white';
+            ctx.fill();
+            ctx.globalAlpha = 1.0;
+            
+            
+        }
     }
     requestAnimationFrame(draw);
   }
