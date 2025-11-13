@@ -297,39 +297,54 @@
     if (progress >= 1) popEffect.active = false;
     }
     function drawSparks(ctx, x, y, radius, count = 8) {
-           const flareY = y - radius * 0.7;
-            const flareHeight = radius * 1.3;      
-            const flareWidth = radius * 0.8;       
+        const flareY = y - radius * 0.7;
+        const flareHeight = radius * 1.5;
+        const flareWidth = radius * 0.7;
 
-            // --- CORE GLOW COLUMN ---
-            const grad = ctx.createLinearGradient(x, flareY, x, flareY - flareHeight);
-            grad.addColorStop(0.0, 'rgba(255, 255, 180, 0.9)');
-            grad.addColorStop(0.2, 'rgba(255, 180, 80, 0.8)');
-            grad.addColorStop(0.5, 'rgba(255, 80, 10, 0.6)');
-            grad.addColorStop(1.0, 'rgba(60, 0, 0, 0)');
+        ctx.save();
+        ctx.globalCompositeOperation = 'lighter';
 
-            ctx.save();
-            ctx.globalCompositeOperation = 'lighter';
-            ctx.fillStyle = grad;
-            ctx.fillRect(x - flareWidth / 2, flareY - flareHeight, flareWidth, flareHeight);
+        // --- BASE GLOW COLUMN ---
+        
+        const grad = ctx.createRadialGradient(x, flareY, 0, x, flareY, flareWidth);
+        grad.addColorStop(0.0, 'rgba(255, 80, 80, 0.7)');     // red core
+        grad.addColorStop(0.3, 'rgba(200, 122, 70, 0.5)');    // purple mid
+        grad.addColorStop(0.6, 'rgba(77, 89, 194, 0.4)');     // dark blue outer
+        grad.addColorStop(1.0, 'rgba(0, 0, 0, 0)');
 
-            // --- FLICKERING FLAME STREAKS ---
-            const flameSpread = flareWidth * 0.6;  
-            for (let i = 0; i < 10; i++) {       
-                const offsetX = (Math.random() - 0.5) * flameSpread;
-                const jitter = (Math.random() - 0.5) * radius * 0.2;
-                const height = flareHeight * (0.8 + Math.random() * 0.4);
-                ctx.beginPath();
-                ctx.moveTo(x + offsetX, flareY + jitter);
-                ctx.lineTo(x + offsetX + (Math.random() - 0.5) * 15, flareY - height);
-                ctx.strokeStyle = `rgba(255, ${100 + Math.random() * 100}, 0, ${0.3 + Math.random() * 0.5})`;
-                ctx.lineWidth = 2 + Math.random() * 3;
-                ctx.shadowBlur = 10;
-                ctx.shadowColor = 'rgba(255, 100, 0, 1)';
-                ctx.stroke();
-            }
-            ctx.restore();
+        ctx.fillStyle = grad;
+        ctx.beginPath();
+        ctx.ellipse(x, flareY, flareWidth, flareHeight, 0, 0, Math.PI * 2);
+        ctx.fill();
 
+        // --- FLOATING COLOR BLOBS ---
+        for (let i = 0; i < 30; i++) {
+            const offsetX = (Math.random() - 0.5) * flareWidth * 1.6;
+            const offsetY = -Math.random() * flareHeight;
+            const blobRadius = radius * (0.1 + Math.random() * 0.3);
+            const alpha = 0.2 + Math.random() * 0.3;
+
+            
+
+            ctx.beginPath();
+            ctx.fillStyle = `rgba(255, ${100 + Math.random() * 100}, 50, ${alpha})`;
+            ctx.ellipse(x + offsetX, flareY + offsetY, blobRadius * 1.5, blobRadius, Math.random() * Math.PI, 0, Math.PI * 2);
+            ctx.shadowBlur = 25;
+            ctx.shadowColor = 'rgba(255, 150, 50, 0.5)';
+            ctx.fill();
+        }
+
+        // --- OUTER HALO ---
+        const haloGrad = ctx.createRadialGradient(x, flareY, 0, x, flareY, flareWidth * 2);
+        haloGrad.addColorStop(0.0, 'rgba(255, 123, 100, 0.2)');
+        haloGrad.addColorStop(1.0, 'rgba(0, 0, 0, 0)');
+
+        ctx.fillStyle = haloGrad;
+        ctx.beginPath();
+        ctx.arc(x, flareY, flareWidth * 2, 0, Math.PI * 2);
+        ctx.fill();
+
+        ctx.restore();
             
 }
 
@@ -524,9 +539,7 @@
         ctx.stroke();
         ctx.restore();
         if (laneActive[i]) {
-            if (toSpark[i]) {
-                drawSparks(ctx,x,y, radius,15);
-            }
+            
             ctx.beginPath();
             ctx.arc(x, y - 5, radius - 10, 0, Math.PI * 2); 
             ctx.lineWidth = 6;
@@ -536,11 +549,13 @@
             ctx.fillStyle = adrenaline == 1 ? lane_colors[i] : lane_colors[5];
             ctx.arc(x, y - 8, radius - 10, 0, Math.PI * 2)
             ctx.fill();
-            ctx.globalAlpha = 0.1;
+            ctx.globalAlpha = 0.05;
             ctx.fillStyle = 'white';
             ctx.fill();
             ctx.globalAlpha = 1.0;
-            
+            if (toSpark[i]) {
+                drawSparks(ctx,x,y, radius,15);
+            }
             
         }
     }
