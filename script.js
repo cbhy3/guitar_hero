@@ -22,7 +22,9 @@
     let countdown = false;
     let judgement = '';
     const laneActive = [false, false, false, false, false];
-    const mapResponse = await fetch('the_wall.json');
+    const queryString = window.location.search;
+    const urlParams = new URLSearchParams(queryString);
+    const mapResponse = await fetch(urlParams.get('song'));
     const map = await mapResponse.json();
     const pixelsPerSecond = scrollSpeed * (map.bpm/100);
     const barFill = document.getElementById("barFill");
@@ -172,7 +174,7 @@
             judgement = 'Miss'
             activeHold.hit = false;
             combo = 0; 
-            adrenaline_meter -= adrenaline === 2 ? 30 : 0; 
+            adrenaline_meter -= adrenaline === 2 ? 100 : 0; 
         } else {
             console.log('success');
             if (now - activeHold.endTime > 0.13 || now - activeHold.endTime < -0.13){ judgement = 'Good'; score += 1 * adrenaline; adrenaline_meter += adrenaline === 1 ? 1 : -2;}
@@ -402,7 +404,7 @@
                 note.hit = false;
                 judgement = 'Miss';
                 combo = 0 ; 
-                adrenaline_meter -= adrenaline === 2 ? 10 : 0; 
+                adrenaline_meter -= adrenaline === 2 ? 100 : 0; 
                 startPop(judgement, 'rgba(224, 11, 11, 1)', canvas.width / 2 - 50, 100);
             }
             

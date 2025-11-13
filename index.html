@@ -96,7 +96,34 @@
       <h3 id="combo">Combo: x0</h3>
       <h3 id="time"></h3>
     </div>
-
+    <div class="song-selector">
+      <form>
+        <label for="name"> Select a Song: </label>
+        <select name ="song" id="song-select">
+          <option value="another_second_chance.json">Another Second Chance - Rocket</option>
+          <option value="living_thing.json">Livin' Thing - Electric Light Orchestra</option>
+          <option value="misery_business.json">Misery Business - Paramore</option>
+          <option value="smoking.json">Smokin' - Boston</option>
+          <option value ="sweet_child_of_mine.json">Sweet Child O' Mine - Guns 'n' Roses</option>
+          <option value = "the_wall.json">The Wall - Kansas</option>
+        </select>
+        <button onclick="submit()"> Confirm</button>
+      </form>
+    </div>
     <script src="script.js"></script>
+    <script>
+      addEventListener("DOMContentLoaded", (event) => {
+        const q = window.location.search;
+      const u = new URLSearchParams(q);
+      const selected = u.get('song')
+      document.getElementById('song-select').value = selected;
+       })
+      
+      
+      function submit() {
+          window.location.reload();
+
+      }
+    </script>
   </body>
 </html>
