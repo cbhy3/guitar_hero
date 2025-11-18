@@ -16,6 +16,7 @@
     const scrollSpeed = 400;
     const lookahead = 1.5;
     
+    
     const windowPerfect = 55;
     const windowGreat = 110;
     const windowGood = 175;
@@ -37,6 +38,8 @@
 
 
     const audioContext = new window.AudioContext();
+    const gainNode = audioContext.createGain();
+    let volume = document.getElementById("volume");
     let audioBuffer, audioStartTime = 0;
     const fetchAudio = async (url) =>
     {
@@ -44,6 +47,7 @@
         const ab = await r.arrayBuffer();
         return await audioContext.decodeAudioData(ab)
     };
+
     audioBuffer = await fetchAudio(map.audio);
 
     const notes = map.notes.map(n =>( {
@@ -59,12 +63,16 @@
     function playSong() {
         const src = audioContext.createBufferSource();
         src.buffer = audioBuffer;
-        src.connect(audioContext.destination);
+        src.connect(gainNode);
+        gainNode.connect(audioContext.destination);
+        gainNode.gain.value = volume.value / 100;
         audioStartTime = audioContext.currentTime + 0.2;
         src.start(audioStartTime);
         currentsrc = src
     }
-
+    volume.addEventListener("change", (event) => {
+        gainNode.gain.value = volume.value/100;
+    });
     const keyMap = {'a': 0, 's': 1, 'j': 2, 'k':3,'l':4};
     window.addEventListener('keydown', (e) =>{
         const key = e.key.toLowerCase();
@@ -296,57 +304,78 @@
 
     if (progress >= 1) popEffect.active = false;
     }
-    function drawSparks(ctx, x, y, radius, count = 8) {
-        const flareY = y - radius * 0.7;
-        const flareHeight = radius * 1.5;
-        const flareWidth = radius * 0.7;
+let _flareGrad = null;
+let _haloGrad = null;
 
-        ctx.save();
-        ctx.globalCompositeOperation = 'lighter';
+function drawSparks(ctx, x, y, radius) {
+    const flareY = y - radius * 0.7;
+    const flareHeight = radius * 1.2;   
+    const flareWidth  = radius * 0.6;   
 
-        // --- BASE GLOW COLUMN ---
-        
-        const grad = ctx.createRadialGradient(x, flareY, 0, x, flareY, flareWidth);
-        grad.addColorStop(0.0, 'rgba(255, 80, 80, 0.7)');     // red core
-        grad.addColorStop(0.3, 'rgba(200, 122, 70, 0.5)');    // purple mid
-        grad.addColorStop(0.6, 'rgba(77, 89, 194, 0.4)');     // dark blue outer
-        grad.addColorStop(1.0, 'rgba(0, 0, 0, 0)');
+    ctx.save();
+    ctx.globalCompositeOperation = 'lighter';
 
-        ctx.fillStyle = grad;
+    if (!_flareGrad) {
+        _flareGrad = ctx.createRadialGradient(0, 0, 0, 0, 0, 1);
+        _flareGrad.addColorStop(0.0, 'rgba(255, 80, 80, 0.6)');
+        _flareGrad.addColorStop(0.3, 'rgba(200, 120, 70, 0.4)');
+        _flareGrad.addColorStop(0.6, 'rgba(77, 89, 194, 0.25)');
+        _flareGrad.addColorStop(1.0, 'rgba(0,0,0,0)');
+    }
+
+    ctx.save();
+    ctx.translate(x, flareY);
+    ctx.scale(flareWidth, flareHeight);
+    ctx.fillStyle = _flareGrad;
+    ctx.beginPath();
+    ctx.arc(0, 0, 1, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+
+
+    const blobCount = 30; 
+    for (let i = 0; i < blobCount; i++) {
+        const offsetX = (Math.random() - 0.5) * flareWidth * 1.2;
+        const offsetY = -Math.random() * flareHeight;
+
+        const blobR = radius * (0.15 + Math.random() * 0.2);
+        const alpha = 0.15 + Math.random() * 0.2;
+
+        ctx.fillStyle = `rgba(255, ${120 + Math.random() * 60}, 60, ${alpha})`;
+
         ctx.beginPath();
-        ctx.ellipse(x, flareY, flareWidth, flareHeight, 0, 0, Math.PI * 2);
+        ctx.ellipse(
+            x + offsetX,
+            flareY + offsetY,
+            blobR * 1.2,
+            blobR * 0.8,
+            Math.random() * Math.PI,
+            0,
+            Math.PI * 2
+        );
         ctx.fill();
+    }
 
-        // --- FLOATING COLOR BLOBS ---
-        for (let i = 0; i < 30; i++) {
-            const offsetX = (Math.random() - 0.5) * flareWidth * 1.6;
-            const offsetY = -Math.random() * flareHeight;
-            const blobRadius = radius * (0.1 + Math.random() * 0.3);
-            const alpha = 0.2 + Math.random() * 0.3;
 
-            
+    // --- OUTER HALO (cached gradient) ---
+    if (!_haloGrad) {
+        _haloGrad = ctx.createRadialGradient(0, 0, 0, 0, 0, 1);
+        _haloGrad.addColorStop(0.0, 'rgba(255, 120, 100, 0.18)');
+        _haloGrad.addColorStop(1.0, 'rgba(0, 0, 0, 0)');
+    }
 
-            ctx.beginPath();
-            ctx.fillStyle = `rgba(255, ${100 + Math.random() * 100}, 50, ${alpha})`;
-            ctx.ellipse(x + offsetX, flareY + offsetY, blobRadius * 1.5, blobRadius, Math.random() * Math.PI, 0, Math.PI * 2);
-            ctx.shadowBlur = 25;
-            ctx.shadowColor = 'rgba(255, 150, 50, 0.5)';
-            ctx.fill();
-        }
+    ctx.save();
+    ctx.translate(x, flareY);
+    ctx.scale(flareWidth * 1.8, flareWidth * 1.8);
+    ctx.fillStyle = _haloGrad;
+    ctx.beginPath();
+    ctx.arc(0, 0, 1, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
 
-        // --- OUTER HALO ---
-        const haloGrad = ctx.createRadialGradient(x, flareY, 0, x, flareY, flareWidth * 2);
-        haloGrad.addColorStop(0.0, 'rgba(255, 123, 100, 0.2)');
-        haloGrad.addColorStop(1.0, 'rgba(0, 0, 0, 0)');
-
-        ctx.fillStyle = haloGrad;
-        ctx.beginPath();
-        ctx.arc(x, flareY, flareWidth * 2, 0, Math.PI * 2);
-        ctx.fill();
-
-        ctx.restore();
-            
+    ctx.restore();
 }
+
 
     function formatTime(seconds) {
         const minutes = Math.floor(seconds / 60);
@@ -554,7 +583,7 @@
             ctx.fill();
             ctx.globalAlpha = 1.0;
             if (toSpark[i]) {
-                drawSparks(ctx,x,y, radius,15);
+                drawSparks(ctx,x,y, radius);
             }
             
         }
