@@ -1,27 +1,30 @@
 (async ()=>{
-    let editMode = false;
-    let score = 0;
-    let combo = 0;
-    let adrenaline_meter = 0;
-    let adrenaline = 1; // adrenaline == 1 means no adrenaline, 2 means adrenaline
-    let recordedNotes = [];
-    let holdStartTimes = {};
-    const toSpark = {0:0,1:0,2:0,3:0,4:0};
-    const keysDown = {};
-    const canvas = document.getElementById('game');
-    const ctx = canvas.getContext('2d');
-    const lanes = 5;
-    const laneWidth = canvas.width / lanes;
-    const hitY = canvas.height - 100;
-    const scrollSpeed = 400;
-    const lookahead = 1.5;
-    
-    
-    const windowPerfect = 55;
-    const windowGreat = 110;
-    const windowGood = 175;
-    let countdown = false;
-    let judgement = '';
+   let editMode = true;
+let score = 0;
+let combo = 0;
+let notesHit = 0;
+let totalNotes = 0;
+let adrenaline_meter = 0;
+let adrenaline = 1; // adrenaline == 1 means no adrenaline, 2 means adrenaline
+let recordedNotes = [];
+let holdStartTimes = {};
+let gameOver = false;
+const toSpark = {0:0,1:0,2:0,3:0,4:0};
+const keysDown = {};
+const canvas = document.getElementById('game');
+const ctx = canvas.getContext('2d');
+const lanes = 5;
+const laneWidth = canvas.width / lanes;
+const hitY = canvas.height - 100;
+const scrollSpeed = 400;
+const lookahead = 1.5;
+
+
+const windowPerfect = 55;
+const windowGreat = 110;
+const windowGood = 175;
+let countdown = false;
+let judgement = '';
     const laneActive = [false, false, false, false, false];
     const queryString = window.location.search;
     const urlParams = new URLSearchParams(queryString);
@@ -74,7 +77,7 @@
         gainNode.gain.value = volume.value/100;
     });
     const keyMap = {'a': 0, 's': 1, 'j': 2, 'k':3,'l':4};
-    window.addEventListener('keydown', (e) =>{
+        window.addEventListener('keydown', (e) =>{
         const key = e.key.toLowerCase();
         if (keysDown[key]) return;
         
@@ -92,6 +95,7 @@
                     clearInterval(interval);
                     if (audioContext.state === 'suspended') audioContext.resume();
                     playSong();
+                    console.log("duration:" + audioBuffer.duration);
                     countdown = false;
                 }
                 }, 1000);
@@ -152,7 +156,6 @@
             }
 
             delete holdStartTimes[lane];
-            console.log('Recorded note:', recordedNotes[recordedNotes.length - 1]);
         }
         }
         
@@ -182,12 +185,13 @@
             judgement = 'Miss'
             activeHold.hit = false;
             combo = 0; 
+            totalNotes++;
             adrenaline_meter -= adrenaline === 2 ? 100 : 0; 
         } else {
             console.log('success');
-            if (now - activeHold.endTime > 0.13 || now - activeHold.endTime < -0.13){ judgement = 'Good'; score += 1 * adrenaline; adrenaline_meter += adrenaline === 1 ? 1 : -2;}
-            else if (now - activeHold.endTime > 0.071 || now-activeHold.endTime < -0.071) { judgement = 'Great'; score += 3 * adrenaline; adrenaline_meter += adrenaline === 1 ? 1 : -2;}
-            else {judgement = 'Perfect'; score += 5 * adrenaline; adrenaline_meter += adrenaline === 1 ? 1 : -2;};
+            if (now - activeHold.endTime > 0.13 || now - activeHold.endTime < -0.13) { judgement = 'Good'; score += 1 * adrenaline; notesHit++; totalNotes++; adrenaline_meter += adrenaline === 1 ? 1 : -2;}
+            else if (now - activeHold.endTime > 0.071 || now - activeHold.endTime < -0.071) { judgement = 'Great'; score += 3 * adrenaline; notesHit++; totalNotes++;  adrenaline_meter += adrenaline === 1 ? 1 : -2;}
+            else { judgement = 'Perfect'; score += 5 * adrenaline; notesHit++; totalNotes++; adrenaline_meter += adrenaline === 1 ? 1 : -2;};
             activeHold.hit = true;
             activeHold.hold_success = true;
             score += Math.round(2 * activeHold.duration/ 10)
@@ -203,14 +207,15 @@
         .sort((a,b) => Math.abs(a.dt) - Math.abs(b.dt));
         if (candidates.length === 0) {
             toSpark[lane] = false;
+            combo = 0;
         return;
         }
         const best = candidates[0];
         const absDt = Math.abs(best.dt);
         judgement = 'Miss';
-        if (absDt <= windowPerfect) {judgement = 'Perfect'; combo += 1; score += 5 * adrenaline ; adrenaline_meter += adrenaline === 1 ? 1 : -2;}
-        else if (absDt <= windowGreat) {judgement = 'Great'; combo += 1; score += 3 * adrenaline; adrenaline_meter += adrenaline === 1 ? 1 : -2; }
-        else if (absDt <= windowGood) {judgement = 'Good'; combo += 1; score += 1 * adrenaline; adrenaline_meter += adrenaline === 1 ? 1 : -2; }
+        if (absDt <= windowPerfect) { judgement = 'Perfect'; combo += 1; score += 5 * adrenaline; notesHit++; totalNotes++; ; adrenaline_meter += adrenaline === 1 ? 1 : -2;}
+        else if (absDt <= windowGreat) { judgement = 'Great'; combo += 1; score += 3 * adrenaline; notesHit++; totalNotes++; adrenaline_meter += adrenaline === 1 ? 1 : -2; }
+        else if (absDt <= windowGood) { judgement = 'Good'; combo += 1; score += 1 * adrenaline; notesHit++; totalNotes++; adrenaline_meter += adrenaline === 1 ? 1 : -2; }
         if (best.n.type === 'tap') {
             best.n.judged = true;
             best.n.hit = absDt <= windowGood;
@@ -432,8 +437,71 @@ function drawSparks(ctx, x, y, radius) {
     else if (!audioStartTime && !countdown) {
       ctx.fillStyle = '#fff';
       ctx.font = '20px sans-serif';
-      ctx.fillText('Press SPACE to start', 120, canvas.height/2);
-    } else {
+        ctx.fillText('Press SPACE to start', 120, canvas.height / 2);
+
+    }
+    else if (gameOver) {
+        const centerY = canvas.height / 2;
+        const centerX = canvas.width / 2;
+
+        ctx.fillStyle = 'rgba(0,0,0,0.55)';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+        const jitterX = 0.01;
+        const jitterY = 0.01;
+
+        ctx.save();
+        ctx.translate(centerX, centerY);
+        ctx.rotate((Math.random() * 2 - 1) * 0.02);
+
+        ctx.strokeStyle = 'rgba(255,255,255,0.12)';
+        ctx.lineWidth = 3;
+        ctx.strokeRect(-190, -140, 380, 200);
+
+        ctx.lineWidth = 1;
+        for (let i = 0; i < 12; i++) {
+            ctx.beginPath();
+            ctx.moveTo(
+                -190 + Math.random() * 380,
+                -140 + Math.random() * 200
+            );
+            ctx.lineTo(
+                -190 + Math.random() * 380,
+                -140 + Math.random() * 200
+            );
+            ctx.stroke();
+        }
+
+        ctx.font = '64px Impact, sans-serif';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+
+        ctx.fillStyle = 'rgba(0,0,0,0.85)';
+        ctx.fillText('SONG FINISHED', jitterX + 3, -50 + jitterY + 3);
+
+        ctx.fillStyle = '#e0d6a8'; 
+        ctx.fillText('SONG FINISHED', jitterX, -50 + jitterY);
+
+        ctx.font = '34px Impact, sans-serif';
+
+        ctx.fillStyle = 'rgba(0,0,0,0.85)';
+        ctx.fillText(`FINAL SCORE`, jitterX + 2, 20 + jitterY + 2);
+        ctx.fillText(`${score}`, jitterX + 2, 65 + jitterY + 2);
+
+        ctx.fillStyle = '#b0e060'; 
+        ctx.fillText(`FINAL SCORE`, jitterX, 20 + jitterY);
+        ctx.fillText(`${score}`, jitterX, 65 + jitterY);
+
+        ctx.fillStyle = 'rgba(0,0,0,0.85)';
+        ctx.fillText(`ACCURACY`, jitterX + 2, 100 + jitterY + 2);
+        ctx.fillText(`${((notesHit/totalNotes)*100).toFixed(2)}%`, jitterX + 2, 145 + jitterY + 2);
+
+        ctx.fillStyle = '#b0e060';
+        ctx.fillText(`ACCURACY`, jitterX + 2, 100 + jitterY + 2);
+        ctx.fillText(`${((notesHit / totalNotes) * 100).toFixed(2) }%`, jitterX + 2, 145 + jitterY + 2);
+        ctx.restore();
+    }
+    else {
       
       const now = audioContext.currentTime;
       const songTime = now - audioStartTime; 
@@ -447,7 +515,8 @@ function drawSparks(ctx, x, y, radius) {
                 note.judged = true;
                 note.hit = false;
                 judgement = 'Miss';
-                combo = 0 ; 
+                combo = 0; 
+                totalNotes++;
                 adrenaline_meter -= adrenaline === 2 ? 100 : 0; 
                 startPop(judgement, 'rgba(224, 11, 11, 1)', canvas.width / 2 - 50, 100);
             }
@@ -455,88 +524,8 @@ function drawSparks(ctx, x, y, radius) {
             
         }
       // render notes within lookahead
-      for (const note of notes) {
-
-        const dt = note.time - songTime;
-        const endDt = note.endTime - songTime;
-        if (endDt < -1) continue;                 
-        if (dt > lookahead) continue;       
-        const yStart = hitY - dt * pixelsPerSecond;
-        const yEnd = hitY - endDt * pixelsPerSecond;
-        const x = note.lane * laneWidth + laneWidth/2;
-
-        if (note.type === 'tap') {
-            ctx.beginPath();
-            ctx.fillStyle = note.judged ? (note.hit ? 'rgba(0, 255, 0, 0)' : '#900') : adrenaline === 2 ? 'rgba(41, 212, 212, 1)' :
-            (note.lane === 0 ?'rgba(41, 144, 22, 1)' : 
-                (note.lane === 1 ? 'rgba(144, 26, 22, 1)' :
-                    note.lane === 2 ? 'rgba(165, 154, 24, 1)' : note.lane === 3 ? 'rgba(22, 55, 144, 1)' : 'rgba(170, 100, 25, 1)'
-                    
-                ));
-            
-            ctx.arc(x, yStart, Math.min(24, 16 + (1 - Math.min(1, dt/lookahead))*12), 0, Math.PI*2);
-            
-            ctx.fill();
-            ctx.save();
-            
-            ctx.clip();
-            ctx.lineWidth = 4;
-            ctx.strokeStyle = note.judged ? (note.hit ? 'rgba(0,0,0,0)' : 'rgba(0, 0, 0, 1)') : 'rgba(0, 0, 0, 1)';
-            ctx.stroke();
-            ctx.restore();
-      }
-        if (note.type === 'hold') {
-            const progressTime = Math.max(0, Math.min(songTime - note.time, note.duration));
-            const progressRatio = progressTime / note.duration;
-
-            let tailStartY = yStart;
-
-            if (note.holding) {
-                if (progressRatio > 0.98) { tailStartY = yEnd }
-                else {
-                tailStartY = hitY - ( progressTime ) * progressRatio/ pixelsPerSecond;
-                }
-
-            }
-
-            ctx.beginPath();
-            ctx.strokeStyle = note.holding ? 'rgba(0, 255, 0, 0.5)' : (!note.released ? adrenaline === 2 ? 'rgba(41, 212, 212, 1)' : (note.lane === 0 ?'rgba(41, 144, 22, 1)' : 
-                (note.lane === 1 ? 'rgba(144, 26, 22, 1)' :
-                    note.lane === 2 ? 'rgba(165, 154, 24, 1)' : note.lane === 3 ? 'rgba(22, 55, 144, 1)' : 'rgba(170, 100, 25, 1)'
-                    
-                )) : 'rgba(0,0,0,0)');
-            ctx.lineWidth = 14;
-            ctx.moveTo(x, tailStartY);
-            ctx.lineTo(x, yEnd);
-            ctx.stroke();
-
-            if (!note.holding) {
-                ctx.beginPath();
-                ctx.fillStyle = note.judged ? (note.hit ? 'rgba(0, 255, 0, 0)' : '#900') : adrenaline === 2 ? 'rgba(41, 212, 212, 1)' : (note.lane === 0 ?'rgba(41, 144, 22, 1)' : 
-                (note.lane === 1 ? 'rgba(144, 26, 22, 1)' :
-                    note.lane === 2 ? 'rgba(165, 154, 24, 1)' : note.lane === 3 ? 'rgba(22, 55, 144, 1)' : 'rgba(170, 100, 25, 1)'
-                    
-                ));;
-                
-                ctx.arc(x, yStart, 20, 0, Math.PI * 2);
-                ctx.fill();
-                ctx.save();
-                
-                ctx.clip();
-                ctx.lineWidth = 4;
-                ctx.strokeStyle = note.judged ? (note.hit ? 'rgba(0,0,0,0)' : 'rgba(0,0,0,1)') : 'rgba(0,0,0,1)';
-                ctx.stroke();
-                ctx.restore();
-            }
-
-            
-            
-            ctx.beginPath();
-            ctx.arc(x, yEnd, 10, 0, Math.PI * 2);
-            ctx.fillStyle = note.hold_success ? 'rgba(0, 102, 102, 0)' : 'rgba(0, 102, 102, 1)';
-            ctx.fill();
-            
-    }
+        for (const note of notes) {
+            const dt = note.time - songTime; const endDt = note.endTime - songTime; if (endDt < -1) continue; if (dt > lookahead) continue; const yStart = hitY - dt * pixelsPerSecond; const yEnd = hitY - endDt * pixelsPerSecond; const x = note.lane * laneWidth + laneWidth / 2; if (note.type === 'tap') { ctx.beginPath(); ctx.fillStyle = note.judged ? (note.hit ? 'rgba(0, 255, 0, 0)' : '#900') : adrenaline === 2 ? 'rgba(41, 212, 212, 1)' : (note.lane === 0 ? 'rgba(41, 144, 22, 1)' : (note.lane === 1 ? 'rgba(144, 26, 22, 1)' : note.lane === 2 ? 'rgba(165, 154, 24, 1)' : note.lane === 3 ? 'rgba(22, 55, 144, 1)' : 'rgba(170, 100, 25, 1)')); ctx.arc(x, yStart, Math.min(24, 16 + (1 - Math.min(1, dt / lookahead)) * 12), 0, Math.PI * 2); ctx.fill(); ctx.save(); ctx.clip(); ctx.lineWidth = 4; ctx.strokeStyle = note.judged ? (note.hit ? 'rgba(0,0,0,0)' : 'rgba(0, 0, 0, 1)') : 'rgba(0, 0, 0, 1)'; ctx.stroke(); ctx.restore(); } if (note.type === 'hold') { const progressTime = Math.max(0, Math.min(songTime - note.time, note.duration)); const progressRatio = progressTime / note.duration; let tailStartY = yStart; if (note.holding) { if (progressRatio > 0.98) { tailStartY = yEnd } else { tailStartY = hitY - (progressTime) * progressRatio / pixelsPerSecond; } } ctx.beginPath(); ctx.strokeStyle = note.holding ? 'rgba(0, 255, 0, 0.5)' : (!note.released ? adrenaline === 2 ? 'rgba(41, 212, 212, 1)' : (note.lane === 0 ? 'rgba(41, 144, 22, 1)' : (note.lane === 1 ? 'rgba(144, 26, 22, 1)' : note.lane === 2 ? 'rgba(165, 154, 24, 1)' : note.lane === 3 ? 'rgba(22, 55, 144, 1)' : 'rgba(170, 100, 25, 1)')) : 'rgba(0,0,0,0)'); ctx.lineWidth = 14; ctx.moveTo(x, tailStartY); ctx.lineTo(x, yEnd); ctx.stroke(); if (!note.holding) { ctx.beginPath(); ctx.fillStyle = note.judged ? (note.hit ? 'rgba(0, 255, 0, 0)' : '#900') : adrenaline === 2 ? 'rgba(41, 212, 212, 1)' : (note.lane === 0 ? 'rgba(41, 144, 22, 1)' : (note.lane === 1 ? 'rgba(144, 26, 22, 1)' : note.lane === 2 ? 'rgba(165, 154, 24, 1)' : note.lane === 3 ? 'rgba(22, 55, 144, 1)' : 'rgba(170, 100, 25, 1)'));; ctx.arc(x, yStart, 20, 0, Math.PI * 2); ctx.fill(); ctx.save(); ctx.clip(); ctx.lineWidth = 4; ctx.strokeStyle = note.judged ? (note.hit ? 'rgba(0,0,0,0)' : 'rgba(0,0,0,1)') : 'rgba(0,0,0,1)'; ctx.stroke(); ctx.restore(); } ctx.beginPath(); ctx.arc(x, yEnd, 10, 0, Math.PI * 2); ctx.fillStyle = note.hold_success ? 'rgba(0, 102, 102, 0)' : 'rgba(0, 102, 102, 1)'; ctx.fill(); }
     }
     
     drawPop(ctx);

@@ -2,84 +2,122 @@
 <html>
   <head>
     <style>
-      body {
-        margin: 0;
-        height: 100vh;
-        display: flex;
-        flex-direction: column;      /* stack canvas + score vertically */
-        justify-content: center;
-        align-items: center;
-        background: #f8f9fa;
-        font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-      }
+     
+body {
+  margin: 0;
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
 
-      canvas {
-        display: block;
-        border: 3px solid #333;
-        border-radius: 10px;
-        box-shadow: 0 6px 18px rgba(0, 0, 0, 0.2);
-      }
-    .bar-container {
-        width: 30px;
-        height: 720px;
-        background: #ccc;
-        border: 3px solid #333;
-        border-radius: 40px;
-        overflow: hidden;
-        position: relative;
-        transition: box-shadow 0.3s ease;
-      }
+  background:
+    repeating-linear-gradient(
+      45deg,
+      #0a0a0a,
+      #0a0a0a 10px,
+      #0f0f0f 10px,
+      #0f0f0f 20px
+    ),
+    radial-gradient(circle at top, #1a001f, #000 70%);
+  font-family: 'Anton', sans-serif;
+  color: #e0e0e0;
+}
 
-      .bar-fill {
-        position: absolute;
-        bottom: 0;
-        width: 100%;
-        height: 0%;
-        background: linear-gradient(to top, #007bff, #66b2ff);
-        transition: height 0.3s ease;
-      }
+.container {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+}
 
-      .glow {
-        box-shadow: 0 0 20px 5px rgba(0, 123, 255, 0.7),
-                    0 0 40px 10px rgba(0, 123, 255, 0.5),
-                    0 0 60px 15px rgba(0, 123, 255, 0.3);
-        animation: pulse 1.5s infinite alternate;
-      }
+canvas {
+  display: block;
+  background: #050505;
+  border: 5px solid #2a2a2a;
+  border-radius: 2px;
+  box-shadow:
+    inset 0 0 40px rgba(0,0,0,0.9),
+    0 0 12px rgba(0,0,0,0.8);
+  filter: contrast(1.1) brightness(0.9);
+}
 
-      @keyframes pulse {
-        from {
-          box-shadow: 0 0 20px 5px rgba(0, 123, 255, 0.5);
-        }
-        to {
-          box-shadow: 0 0 40px 10px rgba(0, 123, 255, 0.8);
-        }
-      }
-      .hud {
-        margin-top: 15px;
-        text-align: center;
-      }
+.bar-container {
+  width: 28px;
+  height: 720px;
+  background: #0b0b0b;
+  border: 4px solid #333;
+  border-radius: 4px;
+  overflow: hidden;
+  position: relative;
+}
 
-      #score, #combo, #time {
-        margin: 5px 0;
-        font-size: 1.2rem;
-        font-weight: 600;
-        color: #333;
-        text-shadow: 1px 1px 3px rgba(0,0,0,0.1);
-      }
+.bar-fill {
+  position: absolute;
+  bottom: 0;
+  width: 100%;
+  height: 0%;
+  background:
+    linear-gradient(
+      to top,
+      #003c3c,
+      #007070,
+      #00a0a0
+    );
+  box-shadow:
+    inset 0 0 8px rgba(0,0,0,0.8);
+  transition: height 0.15s steps(4, end);
+}
 
-      #score {
-        color: #007bff;  /* blue tone */
-      }
+.glow {
+  box-shadow:
+    0 0 10px rgba(0,255,255,0.5),
+    0 0 20px rgba(0,180,180,0.3);
+}
 
-      #combo {
-        color: #28a745;  /* green tone */
-      }
-      .container {
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        gap: 10px;
-      }
+.hud {
+  margin-top: 10px;
+  text-align: center;
+}
+
+#score,
+#combo,
+#time {
+  margin: 2px 0;
+  font-size: 1.4rem;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  color: #ddd;
+  text-shadow:
+    2px 2px 0 #000,
+    -1px -1px 0 rgba(255,255,255,0.05);
+}
+
+#score {
+  color: #5ec7c7;
+}
+
+#combo {
+  color: #7fae4f;
+}
+
+#time {
+  color: #bfa34a;
+}
+
+.song-selector {
+  margin-top: 8px;
+  font-family: 'Special Elite', monospace;
+  font-size: 0.85rem;
+  color: #aaa;
+}
+
+input[type="range"] {
+  width: 160px;
+  accent-color: #666;
+  filter: grayscale(1);
+}
+
     </style>
   </head>
   <body>
